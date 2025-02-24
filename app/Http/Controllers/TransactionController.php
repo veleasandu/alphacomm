@@ -37,12 +37,32 @@ class TransactionController extends Controller
                 description: "Transaction details",
                 content: new OA\JsonContent(ref: "#/components/schemas/Transaction")
             ),
-            new OA\Response(response: 404, description: "Transaction not found"),
+            new OA\Response(
+                response: 404,
+                description: "Transaction not found",
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(
+                            property: "message",
+                            type: "string",
+                            example: "Transaction not found"
+                        )
+                    ]
+                )
+            ),
             new OA\Response(response: 401, description: "Unauthenticated")
         ]
     )]
-    public function show(Transaction $transaction): JsonResponse
+    public function show($id): JsonResponse
     {
+        $transaction = Transaction::find($id);
+        
+        if (!$transaction) {
+            return response()->json([
+                'message' => 'Transaction not found'
+            ], 404);
+        }
+
         $transaction->load('order');
         return response()->json(new TransactionResource($transaction));
     }
@@ -112,7 +132,11 @@ class TransactionController extends Controller
             // Find and update transaction
             DB::beginTransaction();
 
-            $transaction = Transaction::where('response_data->transaction_id', $transactionId)->firstOrFail();
+            $transaction = Transaction::where('response_data->transaction_id', $transactionId)->first();
+            if (!$transaction) {
+                throw new \Exception('Transaction not found: ' . $transactionId);
+            }
+
             $order = $transaction->order;
 
             // Update transaction and order status based on webhook event
